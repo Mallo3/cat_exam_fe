@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  user-select: none;
+  font-family: Arial, Helvetica, sans-serif;
+  background-color: #f4f4f4;
+  overflow: hidden;
+}
+
+/* Custom TCS Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+::-webkit-scrollbar-thumb {
+  background: #bbb;
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #888;
+}
