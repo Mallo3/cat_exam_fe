@@ -1,23 +1,63 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 const API_SECRET = import.meta.env.VITE_API_SECRET || 'cat_prep_secret_2026';
 
 export const useExamStore = create(
   persist(
     (set, get) => ({
+      currentUser: null,
+      examError: null,
       examData: null,
       attemptId: null,
       currentSectionIndex: 0,
       activeQuestionId: null,
       sectionStartTimes: {}, // { VARC: 172300000, DILR: 172302400 }
       responses: {}, // { q1: { selectedAnswer: 'B', status: 'ANSWERED' } }
+      currentView: 'DASHBOARD',
       isSubmitted: false,
       finalResult: null,
 
+      // Login
+      login: async (mobile, password) => {
+        try {
+          const res = await fetch(`${API_BASE}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mobile, password })
+          });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            set({ currentUser: data.user });
+            return true;
+          } else {
+            throw new Error(data.error || 'Login failed');
+          }
+        } catch (err) {
+          console.error(err);
+          throw err;
+        }
+      },
+
+      logout: () => {
+        set({ currentUser: null, examData: null, attemptId: null, responses: {}, currentView: 'DASHBOARD', isSubmitted: false, finalResult: null, examError: null });
+      },
+
+      viewPastResult: (attempt) => {
+        set({ finalResult: attempt, currentView: 'RESULT', isSubmitted: true });
+      },
+
+      returnToDashboard: () => {
+        set({ currentView: 'DASHBOARD', examData: null, attemptId: null, responses: {}, isSubmitted: false, finalResult: null, examError: null });
+      },
+
       // Initialize from backend
-      loadExam: async (examId, userId = 'candidate_01') => {
+      loadExam: async (examId) => {
+        const { currentUser } = get();
+        const userId = currentUser?.mobile || 'candidate_01';
+        set({ examError: null });
+
         try {
           const examRes = await fetch(`${API_BASE}/exams/${examId}`, {
             headers: { Authorization: `Bearer ${API_SECRET}` }
@@ -33,6 +73,21 @@ export const useExamStore = create(
             body: JSON.stringify({ userId, examId })
           });
           const attempt = await attemptRes.json();
+
+          if (!attemptRes.ok) {
+            set({ examError: attempt.error || 'Failed to start exam' });
+            return;
+          }
+
+          // If this was a retake, consume the permission locally to keep UI in sync
+          if (currentUser?.allowedRetakes?.includes(examId)) {
+            set({ 
+              currentUser: {
+                ...currentUser,
+                allowedRetakes: currentUser.allowedRetakes.filter(id => id !== examId)
+              }
+            });
+          }
 
           const firstSection = exam.sections[0];
           const firstQuestion = firstSection.questionGroups[0].questions[0];
@@ -50,6 +105,7 @@ export const useExamStore = create(
             activeQuestionId: firstQuestion.questionId,
             sectionStartTimes: { [firstSection.sectionId]: Date.now() },
             responses: respMap,
+            currentView: 'EXAM',
             isSubmitted: false,
             finalResult: null
           });
@@ -77,7 +133,18 @@ export const useExamStore = create(
         }
       },
 
-      // Update response & save
+      // Update response locally without triggering API sync
+      updateLocalAnswer: (questionId, selectedAnswer, status) => {
+        const { responses } = get();
+        set({
+          responses: {
+            ...responses,
+            [questionId]: { selectedAnswer, status }
+          }
+        });
+      },
+
+      // Update response & save to DB
       saveAnswer: (questionId, selectedAnswer, status) => {
         const { responses } = get();
         set({
@@ -133,14 +200,20 @@ export const useExamStore = create(
 
       // Submit whole exam
       submitExam: async () => {
-        const { attemptId } = get();
+        const { attemptId, responses } = get();
         try {
           const res = await fetch(`${API_BASE}/attempts/${attemptId}/submit`, {
             method: 'POST',
-            headers: { Authorization: `Bearer ${API_SECRET}` }
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${API_SECRET}`
+            },
+            body: JSON.stringify({ finalResponses: responses })
           });
-          const result = await res.json();
-          set({ isSubmitted: true, finalResult: result.finalScores });
+          if (res.ok) {
+            const finalState = await res.json();
+            set({ isSubmitted: true, currentView: 'RESULT', finalResult: finalState.finalScores });
+          }
         } catch (err) {
           console.error('Submission failed', err);
         }

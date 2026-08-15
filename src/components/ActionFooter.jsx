@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function ActionFooter({ onSaveAndNext, onMarkReview, onClear, onSubmitSection }) {
+export default function ActionFooter({ onSaveAndNext, onMarkReview, onClear, onSubmitSection, submitLabel }) {
   return (
     <footer className="h-14 bg-gray-200 border-t border-gray-300 flex items-center justify-between px-4 select-none">
       <div className="flex space-x-3">
@@ -29,7 +29,7 @@ export default function ActionFooter({ onSaveAndNext, onMarkReview, onClear, onS
           onClick={onSubmitSection}
           className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded shadow transition uppercase tracking-wider"
         >
-          Submit
+          {submitLabel || 'Submit'}
         </button>
       </div>
     </footer>

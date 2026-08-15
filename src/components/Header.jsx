@@ -3,7 +3,7 @@ import { useExamStore } from '../store/useExamStore';
 import { Calculator, User } from 'lucide-react';
 
 export default function Header({ onOpenCalculator }) {
-  const { examData, currentSectionIndex, sectionStartTimes, advanceSection } = useExamStore();
+  const { examData, currentSectionIndex, sectionStartTimes, advanceSection, currentUser } = useExamStore();
   const [timeLeft, setTimeLeft] = useState('40:00');
 
   const currentSection = examData?.sections[currentSectionIndex];
@@ -56,8 +56,8 @@ export default function Header({ onOpenCalculator }) {
             <User size={18} />
           </div>
           <div className="text-left">
-            <p className="font-bold">Candidate</p>
-            <p className="text-gray-300">Roll: 26019940</p>
+            <p className="font-bold">{currentUser?.name || 'Candidate'}</p>
+            <p className="text-gray-300">Roll: {currentUser?.mobile || '26019940'}</p>
           </div>
         </div>
       </div>
